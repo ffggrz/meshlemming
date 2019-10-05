@@ -5,19 +5,17 @@
 
 checkHop() {
 	for f in `batctl if | grep -e mesh.: | cut -d: -f1` ; do
-		echo "Mesh-Interface: ""${f}"
 		RADIO=`uci show | grep "${f}" | cut -d. -f2 | cut -d_ -f2`
 		CHANGED=0
-		echo "zugehoeriges Radio-Interface: ""${RADIO}"
 		CURRENT_CHANNEL=`iwinfo "${RADIO}" info | sed -E 's|^ *|\t|g' | tr -s '\n' | sed ':a;N;$!ba;s|\n|\t|g' | sed -E 's|Cell |\n|g'  | sed -E 's|\t+|\t|g' | sed -E 's|^.*Channel: (\d+).*$|\1|g'`
-		echo "aktueller Kanal: ""${CURRENT_CHANNEL}"
+		logger "Meshlemming: aktueller Kanal: ""${CURRENT_CHANNEL}"
 		BEST_MESHCHANNEL=`iwinfo "${RADIO}" scan | sed -E 's|^ *|\t|g' | tr -s '\n' | sed ':a;N;$!ba;s|\n|\t|g' | sed -E 's|Cell |\n|g' | grep "Mode: Mesh Point" | sed -E 's|\t+|\t|g' |  sed -E 's|^.*Channel: (\d+).*Signal: -(\d+).*$|\2\t\1|g' | sort | cut -f2 | head -n1`
-		echo "Bester Mesh-Kanal: ""${BEST_MESHCHANNEL}"
+		logger "Meshlemming: Bester Mesh-Kanal: ""${BEST_MESHCHANNEL}"
 		if [[ "${CURRENT_CHANNEL}" -eq "${BEST_MESHCHANNEL}" ]] 
-			then echo "bereits bester Kanal gewaehlt"; 
+			then logger "Meshlemming: bereits bester Kanal gewaehlt"; 
 		else
-			echo "neuen Kanal " "${BEST_MESHCHANNEL}" " waehlen";
-			echo "uci set wireless."${RADIO}".channel=""${BEST_MESHCHANNEL}";
+			logger "Meshlemming: neuen Kanal " "${BEST_MESHCHANNEL}" " waehlen";
+			logger "Meshlemming: uci set wireless."${RADIO}".channel=""${BEST_MESHCHANNEL}";
 			if [[ "${DEBUG}" -eq 0 ]]
 				then uci set wireless."${RADIO}".channel="${BEST_MESHCHANNEL}"
 			fi
@@ -25,7 +23,7 @@ checkHop() {
 		fi
 	done
 	if [[ "${CHANGED}" -gt 0 ]]
-		then echo "uci commit"; echo "wifi";
+		then logger "Meshlemming: uci commit wireless; wifi";
 		if [[ "${DEBUG}" -eq 0 ]]
 			then uci commit
 			wifi
@@ -38,13 +36,10 @@ VPNIF="mesh-vpn"
 DEBUG=0
 VPN=`batctl gwl | grep -e "^*" | grep -e "${VPNIF}" | wc -l`;
 
-while true; do
-	# Kein Hopping durchfuehren, wenn es eine direkte Verbindung zu den Gateways gibt.
-	if [[ "${VPN}" -eq 1 ]]
-		then exit 0;
-	else 
-		echo "#### checkHop ####";
-		checkHop
-	fi
-	sleep 1m
-done
+# Kein Hopping durchfuehren, wenn es eine direkte Verbindung zu den Gateways gibt.
+if [[ "${VPN}" -eq 1 ]]
+	then exit 0;
+else 
+	logger "Meshlemming: checkHop";
+	checkHop
+fi
